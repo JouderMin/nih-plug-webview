@@ -8,17 +8,14 @@ license = "ISC"
 description = "An adapter to use webview GUIs with NIH-plug"
 
 [workspace]
-members = [
-  "example",
-  "xtask"
-]
+members = ["example", "xtask"]
 
 [dependencies]
-nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git" }
-parking_lot = "0.12.1"
-serde_json = "1.0"
-wry = { version = "0.35.1" }
-baseview = { git = "https://github.com/RustAudio/baseview" }
-raw-window-handle = "0.5"
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", rev = "28b149e" }
+parking_lot = "0.12.5"
+serde_json = "1.0.149"
+wry = { version = "0.54.1" }
+baseview = { git = "https://github.com/JouderMin/baseview", rev = "d1f894e" }
+raw-window-handle = { package = "raw-window-handle", version = "0.6.2" }
 crossbeam = "0.8.2"
 keyboard-types = "0.6.2"
