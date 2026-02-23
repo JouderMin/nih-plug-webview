@@ -1,12 +1,6 @@
 use baseview::{Event, Size, Window, WindowHandle, WindowOpenOptions, WindowScalePolicy};
-use nih_plug::{
-    editor::ParentWindowHandle,
-    prelude::{Editor, GuiContext, ParamSetter},
-};
-use raw_window_handle::{
-    AppKitWindowHandle, HandleError, HasRawWindowHandle, RawWindowHandle, Win32WindowHandle,
-    XcbWindowHandle,
-};
+use nih_plug::prelude::{Editor, GuiContext, ParamSetter};
+use rwh05::HasRawWindowHandle;
 use serde_json::Value;
 use std::{
     borrow::Cow,
@@ -23,10 +17,7 @@ use wry::{
     WebContext, WebView, WebViewBuilder,
 };
 
-use crossbeam::{
-    atomic::AtomicConsume,
-    channel::{unbounded, Receiver},
-};
+use crossbeam::channel::{unbounded, Receiver};
 
 pub use wry::http;
 
@@ -217,62 +208,57 @@ impl Editor for WebViewEditor {
         let keyboard_handler = self.keyboard_handler.clone();
         let mouse_handler = self.mouse_handler.clone();
 
-        let window_handle = baseview::Window::open_parented(
-            &ParentWindowHandleRwh06Wrapper(parent),
-            options,
-            move |window| {
-                let (events_sender, events_receiver) = unbounded();
+        let window_handle = baseview::Window::open_parented(&parent, options, move |window| {
+            let (events_sender, events_receiver) = unbounded();
 
-                let mut web_context = WebContext::new(Some(std::env::temp_dir()));
+            let mut web_context = WebContext::new(Some(std::env::temp_dir()));
 
-                let mut webview_builder = WebViewBuilder::new_with_web_context(&mut web_context)
-                    .with_bounds(wry::Rect {
-                        position: LogicalPosition::new(0, 0).into(),
-                        size: LogicalSize::new(
-                            width.load(Ordering::Relaxed) as u32,
-                            height.load(Ordering::Relaxed) as u32,
-                        )
-                        .into(),
-                    })
-                    .with_accept_first_mouse(true)
-                    .with_devtools(developer_mode)
-                    .with_initialization_script(include_str!("script.js"))
-                    .with_ipc_handler(move |msg: Request<String>| {
-                        if let Ok(json_value) = serde_json::from_str(&msg.body()) {
-                            let _ = events_sender.send(json_value);
-                        } else {
-                            panic!("Invalid JSON from web view: {}.", msg.body());
-                        }
-                    })
-                    .with_background_color(background_color);
+            let mut webview_builder = WebViewBuilder::new_with_web_context(&mut web_context)
+                .with_bounds(wry::Rect {
+                    position: LogicalPosition::new(0, 0).into(),
+                    size: LogicalSize::new(
+                        width.load(Ordering::Relaxed) as u32,
+                        height.load(Ordering::Relaxed) as u32,
+                    )
+                    .into(),
+                })
+                .with_accept_first_mouse(true)
+                .with_devtools(developer_mode)
+                .with_initialization_script(include_str!("script.js"))
+                .with_ipc_handler(move |msg: Request<String>| {
+                    if let Ok(json_value) = serde_json::from_str(&msg.body()) {
+                        let _ = events_sender.send(json_value);
+                    } else {
+                        panic!("Invalid JSON from web view: {}.", msg.body());
+                    }
+                })
+                .with_background_color(background_color);
 
-                if let Some(custom_protocol) = custom_protocol.as_ref() {
-                    let handler = custom_protocol.1.clone();
-                    webview_builder = webview_builder
-                        .with_custom_protocol(custom_protocol.0.to_owned(), move |_, request| {
-                            handler(&request).unwrap()
-                        });
-                }
+            if let Some(custom_protocol) = custom_protocol.as_ref() {
+                let handler = custom_protocol.1.clone();
+                webview_builder = webview_builder
+                    .with_custom_protocol(custom_protocol.0.to_owned(), move |_, request| {
+                        handler(&request).unwrap()
+                    });
+            }
 
-                let webview = match source.as_ref() {
-                    HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
-                    HTMLSource::URL(url) => webview_builder.with_url(*url),
-                }
-                .build_as_child(window);
+            let webview = match source.as_ref() {
+                HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
+                HTMLSource::URL(url) => webview_builder.with_url(*url),
+            }
+            .build_as_child(&BaswViewRwh06Wrapper(window));
 
-                WindowHandler {
-                    context,
-                    event_loop_handler,
-                    webview: webview
-                        .unwrap_or_else(|e| panic!("Failed to construct webview. {}", e)),
-                    events_receiver,
-                    keyboard_handler,
-                    mouse_handler,
-                    width,
-                    height,
-                }
-            },
-        );
+            WindowHandler {
+                context,
+                event_loop_handler,
+                webview: webview.unwrap_or_else(|e| panic!("Failed to construct webview. {}", e)),
+                events_receiver,
+                keyboard_handler,
+                mouse_handler,
+                width,
+                height,
+            }
+        });
         return Box::new(Instance { window_handle });
     }
 
@@ -295,38 +281,42 @@ impl Editor for WebViewEditor {
     fn param_modulation_changed(&self, _id: &str, _modulation_offset: f32) {}
 }
 
-struct ParentWindowHandleRwh06Wrapper(ParentWindowHandle);
+struct BaswViewRwh06Wrapper<'a>(&'a Window<'a>);
 
-unsafe impl HasRawWindowHandle for ParentWindowHandleRwh06Wrapper {
-    fn raw_window_handle(&self) -> Result<RawWindowHandle, HandleError> {
-        match self.0 {
-            ParentWindowHandle::X11Window(window) => {
-                let window = NonZero::new(window);
+impl rwh06::HasWindowHandle for BaswViewRwh06Wrapper<'_> {
+    fn window_handle(&self) -> Result<rwh06::WindowHandle<'_>, rwh06::HandleError> {
+        let rwh06_handler = match self.0.raw_window_handle() {
+            rwh05::RawWindowHandle::Xcb(handler) => {
+                let window = NonZero::new(handler.window);
                 let handle = if let Some(window) = window {
-                    XcbWindowHandle::new(window)
+                    rwh06::XcbWindowHandle::new(window)
                 } else {
-                    return Err(HandleError::Unavailable);
+                    return Err(rwh06::HandleError::Unavailable);
                 };
-                Ok(RawWindowHandle::Xcb(handle))
+                rwh06::RawWindowHandle::Xcb(handle)
             }
-            ParentWindowHandle::AppKitNsView(ns_view) => {
-                let ns_view = NonNull::new(ns_view);
+            rwh05::RawWindowHandle::AppKit(handler) => {
+                let ns_view = NonNull::new(handler.ns_view);
                 let handle = if let Some(ns_view) = ns_view {
-                    AppKitWindowHandle::new(ns_view)
+                    rwh06::AppKitWindowHandle::new(ns_view)
                 } else {
-                    return Err(HandleError::Unavailable);
+                    return Err(rwh06::HandleError::Unavailable);
                 };
-                Ok(RawWindowHandle::AppKit(handle))
+                rwh06::RawWindowHandle::AppKit(handle)
             }
-            ParentWindowHandle::Win32Hwnd(hwnd) => {
-                let hwnd = NonZeroIsize::new(hwnd as isize);
+            rwh05::RawWindowHandle::Win32(handler) => {
+                let hwnd = NonZeroIsize::new(handler.hwnd as isize);
                 let handle = if let Some(hwnd) = hwnd {
-                    Win32WindowHandle::new(hwnd)
+                    rwh06::Win32WindowHandle::new(hwnd)
                 } else {
-                    return Err(HandleError::Unavailable);
+                    return Err(rwh06::HandleError::Unavailable);
                 };
-                Ok(RawWindowHandle::Win32(handle))
+                rwh06::RawWindowHandle::Win32(handle)
             }
-        }
+            _ => {
+                return Err(rwh06::HandleError::NotSupported);
+            }
+        };
+        Ok(unsafe { rwh06::WindowHandle::borrow_raw(rwh06_handler) })
     }
 }
