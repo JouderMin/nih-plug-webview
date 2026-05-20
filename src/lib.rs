@@ -153,7 +153,7 @@ impl WindowHandler {
 impl baseview::WindowHandler for WindowHandler {
     fn on_frame(&mut self, window: &mut baseview::Window) {
         let setter = ParamSetter::new(&*self.context);
-        (self.event_loop_handler)(&self, setter, window);
+        (self.event_loop_handler)(self, setter, window);
     }
 
     fn on_event(&mut self, _window: &mut baseview::Window, event: Event) -> EventStatus {
@@ -217,8 +217,8 @@ impl Editor for WebViewEditor {
                 .with_bounds(wry::Rect {
                     position: LogicalPosition::new(0, 0).into(),
                     size: LogicalSize::new(
-                        width.load(Ordering::Relaxed) as u32,
-                        height.load(Ordering::Relaxed) as u32,
+                        width.load(Ordering::Relaxed),
+                        height.load(Ordering::Relaxed),
                     )
                     .into(),
                 })
@@ -226,7 +226,7 @@ impl Editor for WebViewEditor {
                 .with_devtools(developer_mode)
                 .with_initialization_script(include_str!("script.js"))
                 .with_ipc_handler(move |msg: Request<String>| {
-                    if let Ok(json_value) = serde_json::from_str(&msg.body()) {
+                    if let Ok(json_value) = serde_json::from_str(msg.body()) {
                         let _ = events_sender.send(json_value);
                     } else {
                         panic!("Invalid JSON from web view: {}.", msg.body());
@@ -259,7 +259,7 @@ impl Editor for WebViewEditor {
                 height,
             }
         });
-        return Box::new(Instance { window_handle });
+        Box::new(Instance { window_handle })
     }
 
     fn size(&self) -> (u32, u32) {
@@ -271,7 +271,7 @@ impl Editor for WebViewEditor {
 
     fn set_scale_factor(&self, _factor: f32) -> bool {
         // TODO: implement for Windows and Linux
-        return false;
+        false
     }
 
     fn param_values_changed(&self) {}
