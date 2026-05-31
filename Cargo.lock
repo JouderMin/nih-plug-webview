@@ -120,8 +120,9 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 [[package]]
 name = "baseview"
 version = "0.1.1"
-source = "git+https://github.com/RustAudio/baseview?rev=3dcd68189ee8df27a30693a5e8b27d83b06a9288#3dcd68189ee8df27a30693a5e8b27d83b06a9288"
+source = "git+https://github.com/RustAudio/baseview.git?branch=macos-subclass-refactor#4d7a9cbe0d5d5588d05e2a0b995b71eac9096da3"
 dependencies = [
+ "block2",
  "keyboard-types",
  "nix",
  "objc2",
@@ -1359,6 +1360,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a180dd8642fa45cdb7dd721cd4c11b1cadd4929ce112ebd8b9f5803cc79d536"
 dependencies = [
  "bitflags 2.6.0",
+ "block2",
  "dispatch2",
  "objc2",
 ]
@@ -1385,6 +1387,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3e0adef53c21f888deb4fa59fc59f7eb17404926ee8a6f59f5df0fd7f9f3272"
 dependencies = [
  "bitflags 2.6.0",
+ "block2",
  "objc2",
  "objc2-core-foundation",
 ]
